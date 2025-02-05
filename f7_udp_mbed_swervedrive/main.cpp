@@ -81,11 +81,9 @@ DigitalOut PL_2(PF_13);
 CAN can{PD_0, PD_1, (int)1e6}; // rd,td,1Mhz
 
 // グローバル変数の定義
-int Pulse[6];      // エンコーダーのパルス格納用
-int last_Pulse[6]; // 前回のエンコーダーのパルス格納用（使ってないので削除予定）
-float v[5] = {0.0, 0.0, 0.0, 0.0, 0.0}; // 速度の格納[m/s]
-float RPM[7] = {0.0, 0.0, 0.0, 0.0,
-                0.0, 0.0, 0.0}; // RPMの格納（使ってないので削除予定）
+float Pulse[6]; // エンコーダーのパルス格納用
+float v[5] = {0.0, 0.0, 0.0, 0.0, 0.0}; // 速度の格納[mm/s]
+float d[5] = {0.0, 0.0, 0.0, 0.0, 0.0}; // 変位[m]
 
 float period = 10; // 制御周期[ms]
 float R = 80;      // オムニ直径[mm]
@@ -115,11 +113,11 @@ int main() {
 
   // ネットワーク設定
   // 送信先のIPアドレスとポート
-  const char *destinationIP = "192.168.8.195";
+  const char *destinationIP = "192.168.8.215";
   const uint16_t destinationPort = 4000;
 
   // 自機のIPアドレスとポート
-  const char *myIP = "192.168.8.215";
+  const char *myIP = "192.168.128.215";
   const char *myNetMask = "255.255.255.0";
   const uint16_t receivePort = 5000;
 
@@ -166,23 +164,40 @@ int main() {
     using namespace std::chrono;
 
     // エンコーダーの値を取得
-    Pulse[1] = float(ENC1.getPulses());
-    Pulse[2] = float(ENC2.getPulses());
+    // Pulse[1] = float(ENC1.getPulses());
+    // Pulse[2] = float(ENC2.getPulses());
+    // Pulse[2] = float(ENC3.getPulses());
+    // Pulse[2] = float(ENC4.getPulses());
+
+    Pulse[1] = 1;
+    Pulse[2] = 2;
+    Pulse[3] = 3;
+    Pulse[4] = 4;
 
     v[1] = Pulse[1] * (R * PI / PPRx4) *
            (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
     v[2] = Pulse[2] * (R * PI / PPRx4) *
            (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
-    v[3] += Pulse[1] * R * PI / PPRx4 / 1000; //移動距離[m]
-    v[4] += Pulse[2] * R * PI / PPRx4 / 1000; //移動距離[m]
+    v[3] = Pulse[3] * (R * PI / PPRx4) *
+           (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
+    v[4] = Pulse[4] * (R * PI / PPRx4) *
+           (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
+
+    d[1] += Pulse[1] * R * PI / PPRx4 / 1000; //変位[m]
+    d[2] += Pulse[2] * R * PI / PPRx4 / 1000; //変位[m]
+    d[3] += Pulse[3] * R * PI / PPRx4 / 1000; //変位[m]
+    d[4] += Pulse[4] * R * PI / PPRx4 / 1000; //変位[m]
 
     // エンコーダーをリセット
     ENC1.reset();
     ENC2.reset();
+    ENC3.reset();
+    ENC4.reset();
 
     // 速度データをカンマ区切りの文字列に変換
     char sendData[128]; // 送信データを格納する配列
-    snprintf(sendData, sizeof(sendData), "%f,%f,%f,%f", v[1], v[2], v[3], v[4]);
+    snprintf(sendData, sizeof(sendData), "%f,%f,%f,%f,%f,%f,%f,%f,", v[1], v[2],
+             v[3], v[4], d[1], d[2], d[3], d[4]);
 
     // 送信データを表示（デバッグ用）
     //printf("Sending (%d bytes): %s\n", strlen(sendData), sendData);
@@ -259,11 +274,11 @@ void receive(UDPSocket *receiver) { // UDP受信スレッド
       }
     }
 
-    int servo_pulse = map(data[7], 0, 270, 500, 2500);
-    SERVO1.pulsewidth_us(servo_pulse);
-    SERVO2.pulsewidth_us(servo_pulse);
-    SERVO3.pulsewidth_us(servo_pulse);
-    SERVO4.pulsewidth_us(servo_pulse);
+    // int servo_pulse = map(data[7], 0, 270, 500, 2500);
+    SERVO1.pulsewidth_us(map(data[5], 0, 270, 500, 2500));
+    SERVO2.pulsewidth_us(map(data[6], 0, 270, 500, 2500));
+    SERVO3.pulsewidth_us(map(data[7], 0, 270, 500, 2500));
+    SERVO4.pulsewidth_us(map(data[8], 0, 270, 500, 2500));
     // printf("%d\n", data[1]);
 
     // printf("%f\n",mdd[6]);
