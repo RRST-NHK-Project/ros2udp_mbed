@@ -103,13 +103,18 @@ int main() {
   MD2P.period_us(50);
   MD3P.period_us(50);
   MD4P.period_us(50);
-  MD5P.period_us(50);
-  MD6P.period_us(50);
+  //MD5P.period_us(50);
+  //MD6P.period_us(50);
   /*
   50(us) = 1000(ms) / 20000(Hz) * 10^3
   MDに合わせて調整
   CytronのMDはPWM周波数が20kHzなので上式になる
   */
+
+  SERVO1.period_ms(20);
+  SERVO2.period_ms(20);
+  SERVO3.period_ms(20);
+  SERVO4.period_ms(20);
 
   // ネットワーク設定
   // 送信先のIPアドレスとポート
@@ -117,7 +122,7 @@ int main() {
   const uint16_t destinationPort = 4000;
 
   // 自機のIPアドレスとポート
-  const char *myIP = "192.168.128.215";
+  const char *myIP = "192.168.8.215";
   const char *myNetMask = "255.255.255.0";
   const uint16_t receivePort = 5000;
 
@@ -164,15 +169,10 @@ int main() {
     using namespace std::chrono;
 
     // エンコーダーの値を取得
-    // Pulse[1] = float(ENC1.getPulses());
-    // Pulse[2] = float(ENC2.getPulses());
-    // Pulse[2] = float(ENC3.getPulses());
-    // Pulse[2] = float(ENC4.getPulses());
-
-    Pulse[1] = 1;
-    Pulse[2] = 2;
-    Pulse[3] = 3;
-    Pulse[4] = 4;
+    Pulse[1] = float(ENC1.getPulses());
+    Pulse[2] = float(ENC2.getPulses());
+    Pulse[2] = float(ENC3.getPulses());
+    Pulse[2] = float(ENC4.getPulses());
 
     v[1] = Pulse[1] * (R * PI / PPRx4) *
            (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算

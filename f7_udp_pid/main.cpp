@@ -1,9 +1,9 @@
 /*
 RRST NHK2025
-f7_udpパッケージのフィードフォワード制御用
 IPアドレスは適宜変更すること
 垂直MD基板用にピンを変更
-2024/12/03
+エンコーダーから計算した変位と速度をUDPで送信する
+2025/02/05
 */
 
 #include "EthernetInterface.h"
@@ -11,6 +11,8 @@ IPアドレスは適宜変更すること
 #include "mbed.h"
 #include "rtos.h"
 #include <cstdint>
+
+#define PI 3.141592653589793
 
 //---------------------------QEI---------------------------//
 QEI ENC1(PC_0, PG_1, NC, 2048, QEI::X4_ENCODING);
@@ -53,15 +55,17 @@ DigitalOut MD6D(PC_10);
 
 //サーボ
 PwmOut SERVO1(PB_1);
-// PwmOut SERVO2(PB_6);
-// PwmOut SERVO3(PD_13);
-// PwmOut SERVO4(PD_12);
+PwmOut SERVO2(PB_6);
+PwmOut SERVO3(PD_13);
+PwmOut SERVO4(PD_12);
 
+/*
 //電磁弁(サーボから借りてる)
-// DigitalOut SV1(PB_1);
+DigitalOut SV1(PB_1);
 DigitalOut SV2(PB_6);
 DigitalOut SV3(PD_13);
 DigitalOut SV4(PD_12);
+*/
 
 //スイッチ
 DigitalIn SW1(PF_15);
@@ -76,14 +80,17 @@ DigitalOut PL_2(PF_13);
 // CAN
 CAN can{PD_0, PD_1, (int)1e6}; // rd,td,1Mhz
 
-int Pulse[7];      // エンコーダーのパルス格納用
+// グローバル変数の定義
+float Pulse[6]; // エンコーダーのパルス格納用
+float v[5] = {0.0, 0.0, 0.0, 0.0, 0.0}; // 速度の格納[mm/s]
+float d[5] = {0.0, 0.0, 0.0, 0.0, 0.0}; // 変位[m]
+
 float period = 10; // 制御周期[ms]
-float R = 0.05;    // オムニ直径[mm]
+float R = 2;      // オムニ直径[mm]
 int PPRx4 = 8192;  // エンコーダーのResolution
 
-// MD出力を格納する配列
-double mdd[9]; // dir
-double mdp[9]; // pwm
+double mdd[9]; // MDに出力する方向指令を格納
+double mdp[9]; // MDに出力するduty比を格納
 
 const char *recievefromIP = nullptr; //ネットワーク切断検知用
 
@@ -91,7 +98,7 @@ int main() {
   // 送信データ
   char sendData[32];
 
-  // PWM周期の設定
+  // PWM周波数の設定
   MD1P.period_us(50);
   MD2P.period_us(50);
   MD3P.period_us(50);
@@ -104,18 +111,19 @@ int main() {
   CytronのMDはPWM周波数が20kHzなので上式になる
   */
 
-  // 送信先情報(PCに何か返すときは設定する)
+  // ネットワーク設定
+  // 送信先のIPアドレスとポート
   const char *destinationIP = "192.168.8.195";
-  const uint16_t destinationPort = 4000;
+  const uint16_t destinationPort = 4001;
 
-  // 自機情報
-  const char *myIP = "192.168.0.218";
+  // 自機のIPアドレスとポート
+  const char *myIP = "192.168.8.217";
   const char *myNetMask = "255.255.255.0";
   const uint16_t receivePort = 5000;
 
   // イーサネット経由でインターネットに接続するクラス
   EthernetInterface net;
-  // IPアドレスとPortの組み合わせを格納しておくクラス（構造体でいいのでは？）
+  // IPアドレスとPortの組み合わせを格納しておくクラス
   SocketAddress destination, source, myData;
   // UDP通信関係のクラス
   UDPSocket udp;
@@ -151,67 +159,58 @@ int main() {
   // 受信用のスレッドをスタート
   receiveThread.start(callback(receive, &udp));
 
-  // メインループ(ネットワーク切断検知)
+  // メインループ（送信用）
   while (1) {
+    using namespace std::chrono;
 
+    // エンコーダーの値を取得
+    Pulse[1] = float(ENC1.getPulses());
+    Pulse[2] = float(ENC2.getPulses());
+    Pulse[2] = float(ENC3.getPulses());
+    Pulse[2] = float(ENC4.getPulses());
+
+
+    v[1] = Pulse[1] * (R * PI / PPRx4) *
+           (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
+    v[2] = Pulse[2] * (R * PI / PPRx4) *
+           (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
+    v[3] = Pulse[3] * (R * PI / PPRx4) *
+           (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
+    v[4] = Pulse[4] * (R * PI / PPRx4) *
+           (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
+
+    d[1] += Pulse[1] * R * PI / PPRx4; //変位[mm]
+    d[2] += Pulse[2] * R * PI / PPRx4; //変位[mm]
+    d[3] += Pulse[3] * R * PI / PPRx4; //変位[mm]
+    d[4] += Pulse[4] * R * PI / PPRx4; //変位[mm]
+
+    // エンコーダーをリセット
+    ENC1.reset();
+    ENC2.reset();
+    ENC3.reset();
+    ENC4.reset();
+
+    // 速度データをカンマ区切りの文字列に変換
+    char sendData[128]; // 送信データを格納する配列
+    snprintf(sendData, sizeof(sendData), "%f,%f,%f,%f,%f,%f,%f,%f,", v[1], v[2],
+             v[3], v[4], d[1], d[2], d[3], d[4]);
+
+    // 送信データを表示（デバッグ用）
+    //printf("Sending (%d bytes): %s\n", strlen(sendData), sendData);
+
+    // UDP送信
     if (const int result =
-            udp.sendto(recievefromIP, sendData, sizeof(sendData)) < 0) {
-      while (1) {
-        printf("Connection lost\n");
-        MD1P = 0;
-        MD2P = 0;
-        MD3P = 0;
-        MD4P = 0;
-        MD5P = 0;
-        MD6P = 0;
-      }
+            udp.sendto(destination, sendData, strlen(sendData)) < 0) {
+      printf("send Error: %d\n", result); // エラー処理
     }
 
-    //以下エンコーダー送信用
-    /*
-     using namespace std::chrono;
-
-     // エンコーダーの値を取得
-     Pulse[1] = ENC1.getPulses();
-     Pulse[2] = ENC2.getPulses();
-     Pulse[3] = ENC3.getPulses();
-     Pulse[4] = ENC4.getPulses();
-     Pulse[5] = ENC5.getPulses();
-     Pulse[6] = ENC6.getPulses();
-
-     // エンコーダーをリセット
-     ENC1.reset();
-     ENC2.reset();
-     ENC3.reset();
-     ENC4.reset();
-     ENC5.reset();
-     ENC6.reset();
-
-     // 速度データを文字列に変換
-     for (int i = 0; i <= 7; i++) {
-       char temp[32];             // 一時的なバッファ
-       sprintf(temp, "%d", Pulse[i]); // floatを文字列に変換
-
-       // sendDataにtempをペーストする
-       if (i == 0) {
-         strcpy(sendData, temp); // 最初はそのままペースト
-       } else {
-         strcat(sendData, ","); // 以降カンマ区切りに文字列を連結する
-         strcat(sendData, temp);
-       }
-     }
-
-     // ROS2ノードに現在の速度を送信
-     if (const int result =
-             udp.sendto(destination, sendData, sizeof(sendData)) < 0) {
-       printf("send Error: %d\n", result); // エラーの処理
-     }
-     osDelay(period); // 一定時間待機（制御周期）
-     */
+    ThisThread::sleep_for(period); // 制御周期に合わせて待機
   }
 
+  // スレッドの終了を待つ
   receiveThread.join();
 
+  // UDPソケットを閉じ、ネットワーク接続を切断
   udp.close();
   net.disconnect();
   return 0;
@@ -224,7 +223,7 @@ void receive(UDPSocket *receiver) { // UDP受信スレッド
   SocketAddress source;
   char buffer[64];
 
-  int data[9] = {0, -1, -1, -1, -1, -1, 0, 0, 0};
+  int data[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
   while (1) {
     memset(buffer, 0, sizeof(buffer));
@@ -234,6 +233,7 @@ void receive(UDPSocket *receiver) { // UDP受信スレッド
     } else {
 
       recievefromIP = source.get_ip_address();
+      // printf("%s\n",recievefromIP);
 
       //以下受信した文字列をカンマ区切りでintに変換
       char *ptr;
@@ -260,41 +260,42 @@ void receive(UDPSocket *receiver) { // UDP受信スレッド
       // printf("%d\n",data[7]);
 
       //方向成分と速度成分を分離
-      for (int i = 1; i <= 5; i++) {
+      for (int i = 1; i <= 8; i++) {
         if (data[i] >= 0) {
           mdd[i] = 1;
         } else {
           mdd[i] = 0;
         }
+        mdp[i] = fabs((data[i]) / 100.0);
       }
     }
 
+    // int servo_pulse = map(data[7], 0, 270, 500, 2500);
+    SERVO1.pulsewidth_us(map(data[5], 0, 270, 500, 2500));
+    SERVO2.pulsewidth_us(map(data[6], 0, 270, 500, 2500));
+    SERVO3.pulsewidth_us(map(data[7], 0, 270, 500, 2500));
+    SERVO4.pulsewidth_us(map(data[8], 0, 270, 500, 2500));
+    // printf("%d\n", data[1]);
+
     // printf("%f\n",mdd[6]);
     // printf("%lf, %lf, %lf, %lf\n", mdp[1], mdp[2], mdp[3], mdp[4]);
-    // 
-    printf("%d, %d, %d, %d, %d\n", data[1], data[2], data[3], data[4], data[5]);
+    // printf("%d, %d, %d, %d, %d, %d,, %d, %d\n", data[1], data[2], data[3],
+    //        data[4], data[5], data[6], data[7], data[8]);
 
     // MDに出力
 
-    MD1D = mdd[1]; //電磁弁に転用
-    MD2D = mdd[2]; //電磁弁に転用
-    MD3D = mdd[3]; //電磁弁に転用
-    MD4D = mdd[4]; //電磁弁に転用
-    MD5D = mdd[5]; //電磁弁に転用
-    //MD6D = mdd[4];
+    MD1D = mdd[1];
+    MD2D = mdd[2];
+    MD3D = mdd[3];
+    MD4D = mdd[4];
+    // MD5D = mdd[3];
+    // MD6D = mdd[4];
 
-    // MD1P = mdp[1];
-    // MD2P = mdp[2];
-    // MD3P = mdp[3];
-    // MD4P = mdp[4];
+    MD1P = mdp[1];
+    MD2P = mdp[2];
+    MD3P = mdp[3];
+    MD4P = mdp[4];
     // MD5P = mdp[3];
     // MD6P = mdp[4];
-
-    SERVO1.pulsewidth_us(map(data[8], 0, 180, 500, 2500));
-
-    // SV1 = data[5];
-    // SV2 = mdd[6];
-    // SV3 = mdd[7];
-    // SV4 = mdd[8];
   }
 }
