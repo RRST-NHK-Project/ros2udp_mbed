@@ -103,8 +103,8 @@ int main() {
   MD2P.period_us(50);
   MD3P.period_us(50);
   MD4P.period_us(50);
-  //MD5P.period_us(50);
-  //MD6P.period_us(50);
+  // MD5P.period_us(50);
+  // MD6P.period_us(50);
   /*
   50(us) = 1000(ms) / 20000(Hz) * 10^3
   MDに合わせて調整
@@ -122,7 +122,8 @@ int main() {
   const uint16_t destinationPort = 4000;
 
   // 自機のIPアドレスとポート
-  const char *myIP = "192.168.8.215";
+  //const char *myIP = "192.168.8.215"; // MR
+  const char *myIP = "192.168.0.217"; // DR
   const char *myNetMask = "255.255.255.0";
   const uint16_t receivePort = 5000;
 
@@ -200,7 +201,7 @@ int main() {
              v[3], v[4], d[1], d[2], d[3], d[4]);
 
     // 送信データを表示（デバッグ用）
-    //printf("Sending (%d bytes): %s\n", strlen(sendData), sendData);
+    // printf("Sending (%d bytes): %s\n", strlen(sendData), sendData);
 
     // UDP送信
     if (const int result =
@@ -283,8 +284,8 @@ void receive(UDPSocket *receiver) { // UDP受信スレッド
 
     // printf("%f\n",mdd[6]);
     // printf("%lf, %lf, %lf, %lf\n", mdp[1], mdp[2], mdp[3], mdp[4]);
-    // printf("%d, %d, %d, %d, %d, %d,, %d, %d\n", data[1], data[2], data[3],
-    //        data[4], data[5], data[6], data[7], data[8]);
+    printf("%d, %d, %d, %d, %d, %d,, %d, %d\n", data[1], data[2], data[3],
+           data[4], data[5], data[6], data[7], data[8]);
 
     // MDに出力
 
