@@ -42,7 +42,7 @@ PwmOut MD1P(PA_0);
 PwmOut MD2P(PA_3);
 PwmOut MD3P(PC_7);
 PwmOut MD4P(PC_6);
-// PwmOut MD5P(PC_8);//サーボへ転用
+PwmOut MD5P(PC_8);
 PwmOut MD6P(PC_9);
 
 // DIR
@@ -58,7 +58,7 @@ PwmOut SERVO1(PB_1);
 PwmOut SERVO2(PB_6);
 PwmOut SERVO3(PD_13);
 // PwmOut SERVO4(PD_12);
-PwmOut SERVO4(PC_8); // MD5Pから転用
+PwmOut SERVO4(PB_8); // UART_RXから転用
 
 /*
 //電磁弁(サーボから借りてる)
