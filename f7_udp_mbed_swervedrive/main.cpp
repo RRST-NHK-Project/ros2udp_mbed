@@ -42,7 +42,7 @@ PwmOut MD1P(PA_0);
 PwmOut MD2P(PA_3);
 PwmOut MD3P(PC_7);
 PwmOut MD4P(PC_6);
-PwmOut MD5P(PC_8);
+// PwmOut MD5P(PC_8);//サーボへ転用
 PwmOut MD6P(PC_9);
 
 // DIR
@@ -57,7 +57,8 @@ DigitalOut MD6D(PC_10);
 PwmOut SERVO1(PB_1);
 PwmOut SERVO2(PB_6);
 PwmOut SERVO3(PD_13);
-PwmOut SERVO4(PD_12);
+// PwmOut SERVO4(PD_12);
+PwmOut SERVO4(PC_8); // MD5Pから転用
 
 /*
 //電磁弁(サーボから借りてる)
@@ -122,8 +123,8 @@ int main() {
   const uint16_t destinationPort = 4000;
 
   // 自機のIPアドレスとポート
-  //const char *myIP = "192.168.8.215"; // MR
-  const char *myIP = "192.168.0.217"; // DR
+  const char *myIP = "192.168.8.215"; // MR
+  //const char *myIP = "192.168.0.217"; // DR
   const char *myNetMask = "255.255.255.0";
   const uint16_t receivePort = 5000;
 
@@ -172,8 +173,8 @@ int main() {
     // エンコーダーの値を取得
     Pulse[1] = float(ENC1.getPulses());
     Pulse[2] = float(ENC2.getPulses());
-    Pulse[2] = float(ENC3.getPulses());
-    Pulse[2] = float(ENC4.getPulses());
+    Pulse[3] = float(ENC3.getPulses());
+    Pulse[4] = float(ENC4.getPulses());
 
     v[1] = Pulse[1] * (R * PI / PPRx4) *
            (1000 / period); // エンコーダーのパルスから速度[mm/s]を計算
@@ -284,8 +285,8 @@ void receive(UDPSocket *receiver) { // UDP受信スレッド
 
     // printf("%f\n",mdd[6]);
     // printf("%lf, %lf, %lf, %lf\n", mdp[1], mdp[2], mdp[3], mdp[4]);
-    printf("%d, %d, %d, %d, %d, %d,, %d, %d\n", data[1], data[2], data[3],
-           data[4], data[5], data[6], data[7], data[8]);
+    // printf("%d, %d, %d, %d, %d, %d,, %d, %d\n", data[1], data[2], data[3],
+    //        data[4], data[5], data[6], data[7], data[8]);
 
     // MDに出力
 

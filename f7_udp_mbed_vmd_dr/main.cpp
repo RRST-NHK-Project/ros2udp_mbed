@@ -59,9 +59,9 @@ PwmOut SERVO1(PB_1);
 
 //電磁弁(サーボから借りてる)
 // DigitalOut SV1(PB_1);
-DigitalOut SV2(PB_6);
-DigitalOut SV3(PD_13);
-DigitalOut SV4(PD_12);
+// DigitalOut SV2(PB_6);
+// DigitalOut SV3(PD_13);
+// DigitalOut SV4(PD_12);
 
 //スイッチ
 DigitalIn SW1(PF_15);
@@ -103,6 +103,8 @@ int main() {
   MDに合わせて調整
   CytronのMDはPWM周波数が20kHzなので上式になる
   */
+
+  SERVO1.period_ms(20);
 
   // 送信先情報(PCに何か返すときは設定する)
   const char *destinationIP = "192.168.8.195";
@@ -272,7 +274,7 @@ void receive(UDPSocket *receiver) { // UDP受信スレッド
     // printf("%f\n",mdd[6]);
     // printf("%lf, %lf, %lf, %lf\n", mdp[1], mdp[2], mdp[3], mdp[4]);
     // 
-    printf("%d, %d, %d, %d, %d\n", data[1], data[2], data[3], data[4], data[5]);
+    //sprintf("%d, %d, %d, %d, %d, %d, %d, %d\n", data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]);
 
     // MDに出力
 
@@ -291,6 +293,7 @@ void receive(UDPSocket *receiver) { // UDP受信スレッド
     // MD6P = mdp[4];
 
     SERVO1.pulsewidth_us(map(data[8], 0, 180, 500, 2500));
+    printf("%d\n",data[8]);
 
     // SV1 = data[5];
     // SV2 = mdd[6];
